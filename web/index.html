@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>GameCloud - Ranking</title>
+  <style>
+    :root { --bg: #0f172a; --card: #1e293b; --line: #334155; --text: #cbd5e1; --accent: #ff9900; --ok: #34d399; --err: #f87171; }
+    * { box-sizing: border-box; }
+    body { margin: 0; font-family: Arial, Helvetica, sans-serif; background: var(--bg); color: var(--text); }
+    main { max-width: 900px; margin: 0 auto; padding: 32px 16px; }
+    h1 { color: #fff; margin: 0 0 4px; }
+    .sub { margin: 0 0 24px; color: #94a3b8; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 16px; }
+    .card { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 16px 20px; }
+    h2 { color: var(--accent); margin: 0 0 12px; font-size: 1.2rem; }
+    table { width: 100%; border-collapse: collapse; }
+    td, th { padding: 6px 4px; border-bottom: 1px solid var(--line); text-align: left; }
+    td:last-child, th:last-child { text-align: right; }
+    form { display: grid; grid-template-columns: 1fr 1fr 1fr auto; gap: 8px; margin-top: 16px; }
+    input, select, button { padding: 8px; border-radius: 6px; border: 1px solid var(--line); background: var(--bg); color: #fff; font-size: 0.95rem; }
+    button { background: var(--accent); color: #111; font-weight: bold; cursor: pointer; border: none; }
+    #estado { min-height: 1.2em; margin-top: 8px; }
+    .ok { color: var(--ok); } .err { color: var(--err); }
+    @media (max-width: 600px) { form { grid-template-columns: 1fr; } }
+  </style>
+</head>
+<body>
+<main>
+  <h1>GameCloud Ranking</h1>
+  <p class="sub">Frontend en S3 &middot; API Gateway + Lambda &middot; SQS &middot; DynamoDB</p>
+
+  <div class="grid">
+    <section class="card"><h2>Doom</h2><table id="tabla-doom"></table></section>
+    <section class="card"><h2>Pac-Man</h2><table id="tabla-pacman"></table></section>
+  </div>
+
+  <section class="card" style="margin-top:16px">
+    <h2>Cargar un puntaje</h2>
+    <form id="form">
+      <input id="jugador" placeholder="Jugador" required>
+      <select id="juego"><option value="doom">Doom</option><option value="pacman">Pac-Man</option></select>
+      <input id="puntaje" type="number" min="0" placeholder="Puntaje" required>
+      <button type="submit">Enviar</button>
+    </form>
+    <div id="estado"></div>
+  </section>
+</main>
+
+<!-- config.js lo genera scripts/05_api.sh con la URL de la API -->
+<script src="config.js"></script>
+<script>
+  const API = window.GAMECLOUD_API;
+
+  function pintar(juego, filas) {
+    const t = document.getElementById("tabla-" + juego);
+    t.innerHTML = "<tr><th>#</th><th>Jugador</th><th>Puntaje</th></tr>";
+    if (!filas.length) { t.innerHTML += "<tr><td colspan='3'>Sin puntajes todavía</td></tr>"; return; }
+    filas.forEach((f, i) => {
+      const tr = document.createElement("tr");
+      [i + 1, f.jugador, f.puntaje].forEach(v => { const td = document.createElement("td"); td.textContent = v; tr.appendChild(td); });
+      t.appendChild(tr);
+    });
+  }
+
+  async function cargarRanking() {
+    try {
+      const r = await fetch(API + "/ranking");
+      const datos = await r.json();
+      Object.entries(datos).forEach(([juego, filas]) => pintar(juego, filas));
+    } catch (e) {
+      document.getElementById("estado").innerHTML = "<span class='err'>No se pudo consultar la API</span>";
+    }
+  }
+
+  document.getElementById("form").addEventListener("submit", async (ev) => {
+    ev.preventDefault();
+    const estado = document.getElementById("estado");
+    const body = {
+      jugador: document.getElementById("jugador").value,
+      juego: document.getElementById("juego").value,
+      puntaje: Number(document.getElementById("puntaje").value),
+    };
+    const r = await fetch(API + "/scores", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+    const datos = await r.json();
+    estado.innerHTML = r.status === 202
+      ? "<span class='ok'>Puntaje encolado. El ranking se actualiza en unos segundos.</span>"
+      : "<span class='err'>" + (datos.error || "Error") + "</span>";
+    setTimeout(cargarRanking, 3000);
+  });
+
+  cargarRanking();
+  setInterval(cargarRanking, 10000);
+</script>
+</body>
+</html>

@@ -1,0 +1,21 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.env
+.venv/
+env/
+venv/
+
+# Lambda packages
+*.zip
+lambdas/*.zip
+
+# Dynamic frontend config (generated during deploy)
+web/config.js
+
+# OS & Temp
+.DS_Store
+Thumbs.db
+*.log
+tmp/
